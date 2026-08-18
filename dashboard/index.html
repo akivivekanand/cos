@@ -446,6 +446,28 @@
   .gate .note{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-top:16px;line-height:1.7}
   .gate code{color:var(--aub);font-weight:700}
   .hidden{display:none !important}
+  .brow .proj{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+  .rowbtn{appearance:none;background:none;border:none;cursor:pointer;padding:0;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--aub)}
+  .rowbtn::before{content:"+ "}
+  .rowbtn:hover{text-decoration:underline}
+  .rowbtn:focus-visible{outline:2px solid var(--aub);outline-offset:2px}
+  .brow-expand{background:var(--paper);border:1px solid var(--line);padding:16px 18px;margin:-1px 0 14px}
+  .brow-expand textarea{min-height:76px}
+  .brow-expand .btn{margin-top:8px}
+  .hist{margin-top:16px;border-top:1px solid var(--line-soft)}
+  .hist .h-item{display:grid;grid-template-columns:118px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-soft)}
+  .hist .h-meta{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft)}
+  .hist .h-meta b{display:block;color:var(--ink)}
+  .hist .st-q{color:var(--ochre);font-weight:700}
+  .hist .st-d{color:var(--moss);font-weight:700}
+  .hist .h-text{font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+  .hist .h-empty{font-family:var(--mono);font-size:11px;color:var(--ink-soft);padding:12px 0}
+  .tagrow{margin:10px 0 0}
+  .tagrow label{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-right:8px}
+  select.tagsel{background:var(--bone);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);font-size:11.5px;padding:6px 8px}
+  select.tagsel:focus-visible{outline:2px solid var(--aub);outline-offset:-1px}
+  .sig .ptag{color:var(--aub);font-weight:700;margin-right:8px}
+  @media (max-width:760px){ .hist .h-item{grid-template-columns:1fr;gap:4px} }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
@@ -547,6 +569,7 @@
           <div class="panel">
             <h3>Paste a signal</h3>
             <textarea id="pasteBox" placeholder="Copilot inventory, meeting notes, anything text. It lands as a signal row and gets read at the next checkout." aria-label="Paste a signal"></textarea>
+            <div class="tagrow"><label for="tagSel">Tag to project</label><select id="tagSel" class="tagsel"><option value="">none</option><option value="calendar">calendar</option></select></div>
             <button class="btn" id="pasteBtn">Write to signals</button>
           </div>
           <div class="panel">
@@ -687,7 +710,7 @@ function fetchState(then){
     supa.from('decisions').select('*').order('decision_date',{ascending:false}).limit(40),
     supa.from('flags').select('*').is('resolved_at',null).order('flag_date',{ascending:true}),
     supa.from('today').select('*').eq('log_date',todayIso).limit(1),
-    supa.from('signals').select('id,lane,filename,processed_at,created_at').order('created_at',{ascending:false}).limit(30),
+    supa.from('signals').select('id,lane,filename,processed_at,created_at,project_slug').order('created_at',{ascending:false}).limit(30),
     supa.from('signals').select('id',{count:'exact',head:true}).is('processed_at',null),
     supa.from('daily_logs').select('log_date,signals_count').order('log_date',{ascending:true}).limit(60),
     supa.from('briefs').select('*').order('generated_at',{ascending:false}).limit(1)
@@ -707,7 +730,7 @@ function fetchState(then){
     var td=(r[4].data||[])[0]||null;
     var today=td?{date:td.log_date,current:td.log_date===todayIso,schedule:td.schedule||[],hours:td.hours||null}:null;
     var sigItems=(r[5].data||[]).map(function(s){
-      return { file:s.filename||s.lane, mtime:s.created_at, lane:s.lane, done:!!s.processed_at };
+      return { file:s.filename||s.lane, mtime:s.created_at, lane:s.lane, done:!!s.processed_at, project:s.project_slug||null };
     });
     var pending=r[6].count||0;
     var todayCount=sigItems.filter(function(s){return s.mtime&&isoLocal(new Date(s.mtime))===todayIso;}).length;
@@ -831,6 +854,7 @@ function renderPulse(){
     var now=new Date();
     for(var i=0;i<s.today.schedule.length;i++){
       var row=s.today.schedule[i];
+      if(String(row.kind||'').toLowerCase()==='break') continue;
       var m=String(row.time||'').match(/(\d{1,2}):(\d{2})\s*([AP]M)?/i);
       if(m){ var hh=parseInt(m[1],10); if(m[3]&&/pm/i.test(m[3])&&hh<12)hh+=12; if(m[3]&&/am/i.test(m[3])&&hh===12)hh=0;
         var t=new Date(now); t.setHours(hh,parseInt(m[2],10),0,0);
@@ -881,7 +905,7 @@ function renderBoard(){
   var s=STATE,html='<div class="brow head"><span>Project</span><span>Status</span><span>Next action</span><span>Milestone</span><span style="text-align:right">Touched</span></div>';
   var order={attention:0,active:1,waiting:2,steady:3};
   s.projects.slice().sort(function(a,b){return (order[a.status]||9)-(order[b.status]||9);}).forEach(function(p){
-    html+='<div class="brow"><span class="proj">'+esc(p.name)+'</span>'+statusChip(p.status)
+    html+='<div class="brow" data-slug="'+esc(p.file)+'"><span class="proj"><span>'+esc(p.name)+'</span><button class="rowbtn" data-slug="'+esc(p.file)+'" aria-expanded="false">Updates</button></span>'+statusChip(p.status)
       +'<span class="next">'+esc(p.next)+'</span>'
       +'<span class="prog">'+(p.milestone&&p.milestone.toLowerCase()!=='ongoing'
         ?'<span class="track"><span class="fill'+fillClass(p.status)+'" data-w="'+p.pct+'"></span></span><span class="pv">'+esc(p.milestone)+' · '+p.pct+'%</span>'
@@ -890,6 +914,7 @@ function renderBoard(){
   });
   $('board-body').innerHTML=html;
   $('board-eyebrow').textContent='Active projects · '+s.projects.length;
+  document.querySelectorAll('#board-body .rowbtn').forEach(function(btn){ btn.addEventListener('click',function(){ toggleUpdates(btn.dataset.slug, btn); }); });
 }
 
 function renderDecisions(){
@@ -941,7 +966,7 @@ function renderSignals(){
     s.signals.items.forEach(function(it){
       var d=it.mtime?new Date(it.mtime):null;
       var lane=it.lane==='paste'?['paste','Paste']:(it.lane==='flow'?['flow','Flow']:['drop','Drop']);
-      html+='<div class="sig"><span class="t">'+(d?esc(fmtStamp(d)):'·')+'</span><span class="lanetag '+lane[0]+'">'+lane[1]+'</span><span class="file">'+esc(it.file)+'</span><span class="state '+(it.done?'done':'q')+'">'+(it.done?'distilled at checkout':'queued for checkout')+'</span></div>';
+      html+='<div class="sig"><span class="t">'+(d?esc(fmtStamp(d)):'·')+'</span><span class="lanetag '+lane[0]+'">'+lane[1]+'</span><span class="file">'+(it.project?'<span class="ptag">['+esc(it.project)+']</span>':'')+esc(it.file)+'</span><span class="state '+(it.done?'done':'q')+'">'+(it.done?'distilled at checkout':'queued for checkout')+'</span></div>';
     });
   }
   el.innerHTML=html;
@@ -949,8 +974,67 @@ function renderSignals(){
 }
 
 function renderAll(){
+  var sel=$('tagSel');
+  if(sel&&STATE&&STATE.projects){ var cur=sel.value; sel.innerHTML='<option value="">none</option><option value="calendar">calendar</option>'+STATE.projects.map(function(p){return '<option value="'+esc(p.file)+'">'+esc(p.file)+'</option>';}).join(''); sel.value=cur; }
   renderMasthead(); renderPulse(); renderBrief(); renderBoard(); renderDecisions(); renderWeek(); renderSignals();
   animateView(document.querySelector('.view.active'));
+}
+
+// ============ update lane (board expander) ============
+function historyItem(sig){
+  var d=sig.created_at?new Date(sig.created_at):null;
+  var done=!!sig.processed_at;
+  var text=done?(sig.summary||'distilled at checkout'):(sig.content||sig.filename||'');
+  return '<div class="h-item"><div class="h-meta"><b>'+(d?esc(fmtStamp(d)):'·')+'</b><span class="'+(done?'st-d':'st-q')+'">'+(done?'distilled':'queued')+'</span></div><div class="h-text">'+esc(text)+'</div></div>';
+}
+function loadHistory(slug, box){
+  box.innerHTML='<div class="h-empty">Reading history…</div>';
+  function render(rows){
+    box.innerHTML=rows.length?rows.map(historyItem).join(''):'<div class="h-empty">No updates yet for this project. The first one you queue lands here.</div>';
+  }
+  if(window.COS_MOCK_STATE){
+    render((window.COS_MOCK_STATE.mockHistory||{})[slug]||[]);
+    return;
+  }
+  if(!supa){ box.innerHTML='<div class="h-empty">Not connected.</div>'; return; }
+  supa.from('signals').select('created_at,processed_at,content,summary,filename')
+    .eq('project_slug',slug).order('created_at',{ascending:false}).limit(20)
+    .then(function(r){
+      if(r.error){ box.innerHTML='<div class="h-empty">'+esc(r.error.message)+'</div>'; return; }
+      render(r.data||[]);
+    });
+}
+function toggleUpdates(slug, btn){
+  var row=btn.closest('.brow');
+  var open=document.querySelector('.brow-expand');
+  var wasThis=open&&open.dataset.slug===slug;
+  if(open){
+    var openBtn=document.querySelector('.rowbtn[aria-expanded="true"]');
+    if(openBtn)openBtn.setAttribute('aria-expanded','false');
+    open.remove();
+  }
+  if(wasThis)return;
+  btn.setAttribute('aria-expanded','true');
+  var panel=document.createElement('div');
+  panel.className='brow-expand';
+  panel.dataset.slug=slug;
+  panel.innerHTML='<textarea class="upd-box" aria-label="Update for '+esc(slug)+'" placeholder="What moved on '+esc(slug)+'? Queued as a tagged signal; checkout applies it to the row and keeps it as history."></textarea>'
+    +'<button class="btn upd-btn">Queue update</button>'
+    +'<div class="hist"></div>';
+  row.insertAdjacentElement('afterend',panel);
+  var hist=panel.querySelector('.hist');
+  loadHistory(slug,hist);
+  panel.querySelector('.upd-btn').addEventListener('click',function(){
+    var tb=panel.querySelector('.upd-box');
+    var text=tb.value.trim();
+    if(!text){ tb.focus(); return; }
+    if(!supa){ toast('Not connected'); return; }
+    supa.from('signals').insert({lane:'paste',filename:slug+' update',content:text,project_slug:slug}).then(function(r){
+      if(r.error){ toast('Write failed: '+r.error.message); return; }
+      tb.value=''; toast('Update queued for '+slug);
+      loadHistory(slug,hist);
+    });
+  });
 }
 
 // ============ input lane ============
@@ -959,7 +1043,8 @@ $('pasteBtn').addEventListener('click',function(){
   if(!text){ $('pasteBox').focus(); return; }
   if(!supa){ toast('Not connected'); return; }
   var name='pasted '+fmtStamp(new Date());
-  supa.from('signals').insert({lane:'paste',filename:name,content:text}).then(function(r){
+  var tag=$('tagSel')?($('tagSel').value||null):null;
+  supa.from('signals').insert({lane:'paste',filename:name,content:text,project_slug:tag}).then(function(r){
     if(r.error){ toast('Write failed: '+r.error.message); return; }
     $('pasteBox').value=''; toast('Signal queued'); fetchState();
   });
@@ -1018,7 +1103,7 @@ if(window.COS_MOCK_STATE){
     if(r.data.session){ hideGate(); fetchState(); }
     else showGate('login');
   });
-  setInterval(function(){ if(!document.hidden&&STATE) fetchState(); },90000);
+  setInterval(function(){ if(!document.hidden&&STATE&&!document.querySelector('.brow-expand')) fetchState(); },90000);
 }
 </script>
 </body>
