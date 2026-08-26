@@ -32,6 +32,7 @@ Never print the key. If a call fails, show the error plainly and stop. Never inv
 - `flags?resolved_at=is.null&select=*&order=flag_date.asc`
 - `signals?processed_at=is.null&select=id,lane,filename,created_at`
 - `weekly_logs?select=*&order=week_of.desc&limit=1`
+- `checklist_items?item_date=eq.<today>&select=*&order=position.asc`
 
 Compute two things before writing a word:
 
@@ -53,7 +54,10 @@ Markdown, exactly these headings, in this order, nothing added and nothing dropp
 
 **Since `<last log day>`** · What actually happened, from the most recent daily log and any project touched since. Facts, not narration.
 
-**Today** · The `today` row for this date: the schedule, and the hours split with `open` named. If no row exists for today, say that the last checkout did not set today and stop pretending otherwise.
+**Today** · The `today` row for this date: the schedule, and the hours split with `open` named. If no row exists for today, say that the last checkout did not set today and stop pretending otherwise. Include today's checklist from `checklist_items`: open items in position
+order, with the done count stated plainly. If no rows exist for today, say the
+last checkout did not seed a checklist and stop pretending otherwise. The
+checklist is read here, never written here.
 
 **The week's arc** · The `week` row. If `set_at` is still `pending`, say the week was never set at closeout. Priorities with their percentages, and where the week stands against them.
 

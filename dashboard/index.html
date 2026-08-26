@@ -367,6 +367,20 @@
   @keyframes flash{0%{background:var(--aub-wash)}100%{background:transparent}}
   .sig .state.q{color:var(--ochre);font-weight:700}
 
+  /* ------- checklist ------- */
+  .ck-row{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-soft);cursor:pointer}
+  .ck-row:last-child{border-bottom:none}
+  .ck-box{flex:0 0 auto;width:18px;height:18px;margin-top:2px;border:1.5px solid var(--line);border-radius:3px;position:relative;background:var(--paper)}
+  .ck-row.done .ck-box{background:var(--aub);border-color:var(--aub)}
+  .ck-row.done .ck-box::after{content:"";position:absolute;left:5px;top:1.5px;width:4px;height:9px;border:solid var(--paper);border-width:0 2px 2px 0;transform:rotate(42deg)}
+  .ck-text{flex:1 1 auto;display:flex;flex-direction:column;gap:2px}
+  .ck-title{font-size:15px;color:var(--ink)}
+  .ck-row.done .ck-title{color:var(--ink-soft);text-decoration:line-through}
+  .ck-note{font-size:10.5px;color:var(--ink-soft)}
+  .ck-src{font-size:10.5px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:2px;padding-top:4px}
+  .ck-add{display:flex;gap:10px;margin-top:14px}
+  .ck-add input{flex:1 1 auto;background:var(--paper);border:1px solid var(--line);padding:9px 10px;color:var(--ink);font:inherit;font-size:13.5px}
+
   /* ------- footer ------- */
   footer{
     margin-top:70px;padding-top:18px;border-top:1px solid var(--line);
@@ -527,6 +541,15 @@
         <div class="eyebrow" id="pulse-eyebrow">Instruments · read from Supabase</div>
       </div>
       <div class="pulse" id="pulse-grid"></div>
+      <div class="blk reveal" style="--d:.12s;margin-top:26px">
+        <div class="eyebrow" id="ck-eyebrow">Today's checklist</div>
+        <div id="ck-body"></div>
+        <div class="ck-add">
+          <input id="ck-input" type="text" maxlength="140"
+                 placeholder="Add an item for today (your write, not the AI's)">
+          <button class="btn ghost" id="ck-addBtn">Add</button>
+        </div>
+      </div>
     </section>
 
     <section class="view" id="view-brief" role="tabpanel" aria-labelledby="tab-brief">
@@ -713,7 +736,8 @@ function fetchState(then){
     supa.from('signals').select('id,lane,filename,processed_at,created_at,project_slug').order('created_at',{ascending:false}).limit(30),
     supa.from('signals').select('id',{count:'exact',head:true}).is('processed_at',null),
     supa.from('daily_logs').select('log_date,signals_count').order('log_date',{ascending:true}).limit(60),
-    supa.from('briefs').select('*').order('generated_at',{ascending:false}).limit(1)
+    supa.from('briefs').select('*').order('generated_at',{ascending:false}).limit(1),
+    supa.from('checklist_items').select('*').eq('item_date',todayIso).order('position',{ascending:true})
   ]).then(function(r){
     var err=r.find(function(x){return x.error;});
     if(err){ $('statusline').innerHTML='<span class="warn">Supabase error: '+esc(err.error.message)+' · has schema.sql been run?</span>'; return; }
@@ -754,7 +778,8 @@ function fetchState(then){
     STATE={ now:now.toISOString(), projects:projects, week:week, decisions:decisions, flags:flags,
       today:today, brief:bf?{md:bf.md,generatedAt:bf.generated_at}:null,
       signals:{items:sigItems,pending:pending,todayCount:todayCount},
-      stats:{streak:streak,lastLog:lastLog,dailyCount:logs.length}, spark:spark };
+      stats:{streak:streak,lastLog:lastLog,dailyCount:logs.length}, spark:spark,
+      checklist:r[9].data||[] };
     renderAll(); if(then)then();
   }).catch(function(e){
     $('statusline').innerHTML='<span class="warn">Could not reach Supabase · '+esc(e.message||e)+'</span>';
@@ -976,9 +1001,61 @@ function renderSignals(){
 function renderAll(){
   var sel=$('tagSel');
   if(sel&&STATE&&STATE.projects){ var cur=sel.value; sel.innerHTML='<option value="">none</option><option value="calendar">calendar</option>'+STATE.projects.map(function(p){return '<option value="'+esc(p.file)+'">'+esc(p.file)+'</option>';}).join(''); sel.value=cur; }
-  renderMasthead(); renderPulse(); renderBrief(); renderBoard(); renderDecisions(); renderWeek(); renderSignals();
+  renderMasthead(); renderPulse(); renderChecklist(); renderBrief(); renderBoard(); renderDecisions(); renderWeek(); renderSignals();
   animateView(document.querySelector('.view.active'));
 }
+
+// ============ checklist ============
+function renderChecklist(){
+  var box=$('ck-body'); if(!box)return;
+  var rows=(STATE&&STATE.checklist||[]).filter(function(r){return r.status==='open'||r.status==='done';});
+  var doneN=rows.filter(function(r){return r.status==='done';}).length;
+  $('ck-eyebrow').textContent="Today's checklist · "+doneN+' of '+rows.length+' closed · taps write as you';
+  if(!rows.length){
+    box.innerHTML='<div class="empty">No checklist for today. Checkout seeds tomorrow; add an item below if the day needs one.</div>';
+    return;
+  }
+  box.innerHTML=rows.map(function(r){
+    var meta=[];
+    if(r.note)meta.push(esc(r.note));
+    if(r.carried_from)meta.push('carried from '+esc(r.carried_from));
+    if(r.project_slug)meta.push(esc(r.project_slug));
+    return '<div class="ck-row'+(r.status==='done'?' done':'')+'" data-id="'+esc(r.id)+'">'
+      +'<span class="ck-box" aria-hidden="true"></span>'
+      +'<span class="ck-text"><span class="ck-title">'+esc(r.title)+'</span>'
+      +(meta.length?'<span class="ck-note mono">'+meta.join(' · ')+'</span>':'')
+      +'</span>'
+      +(r.source_url?'<a class="ck-src mono" target="_blank" rel="noopener" href="'+esc(r.source_url)+'">record</a>':'')
+      +'</div>';
+  }).join('');
+}
+function toggleChecklist(id){
+  if(!supa)return;
+  var r=(STATE&&STATE.checklist||[]).find(function(x){return x.id===id;});
+  if(!r||(r.status!=='open'&&r.status!=='done'))return;
+  var was=r.status, wasAt=r.done_at;
+  r.status=(was==='done'?'open':'done');
+  r.done_at=(r.status==='done'?new Date().toISOString():null);
+  renderChecklist();
+  supa.from('checklist_items').update({status:r.status,done_at:r.done_at}).eq('id',id).then(function(res){
+    if(res.error){ r.status=was; r.done_at=wasAt; renderChecklist(); toast('Write failed: '+res.error.message); }
+  });
+}
+$('ck-body').addEventListener('click',function(ev){
+  if(ev.target.closest('a'))return;
+  var row=ev.target.closest('.ck-row');
+  if(row)toggleChecklist(row.dataset.id);
+});
+$('ck-addBtn').addEventListener('click',function(){
+  if(!supa)return;
+  var inp=$('ck-input'), t=(inp.value||'').trim();
+  if(!t)return;
+  var pos=((STATE&&STATE.checklist)||[]).length+1;
+  supa.from('checklist_items').insert({item_date:isoLocal(new Date()),title:t,position:pos}).then(function(res){
+    if(res.error){ toast('Add failed: '+res.error.message); return; }
+    inp.value=''; toast('Added'); fetchState();
+  });
+});
 
 // ============ update lane (board expander) ============
 function historyItem(sig){

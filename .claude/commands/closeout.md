@@ -11,6 +11,9 @@ Follow CLAUDE.md throughout. Steps:
    - Decisions made this week, by date.
    - Flags opened and flags closed. Anything open more than a week gets named as open.
    - Checkouts missed. If a working day has no daily log, say which.
+   - Checklist honesty: the week's completion rate across checklist_items,
+     and every item carried two or more working days, each named as either
+     mis-scoped or avoided, with which.
    No inflation. A week that did not go well reads as a week that did not go well.
 4. INSERT the weekly_logs row: five-line synthesis (what shipped, what slipped and why, what it means for next week).
 5. ASK her one question: next week's three priorities, or should I propose them from state? If proposing, propose exactly three with a one-line Why each and let her confirm or edit.

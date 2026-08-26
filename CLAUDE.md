@@ -40,6 +40,16 @@ Writes add `-H "Content-Type: application/json" -H "Prefer: return=representatio
 - `daily_logs`: log_date, signals_count, body (what moved, decisions, flags delta, tomorrow's setup).
 - `weekly_logs`: week_of, body (five-line synthesis).
 - `briefs`: generated_at, md (the full brief in markdown).
+- `checklist_items`: item_date, position, title, note, source_url (link to the
+  record system, usually Notion), project_slug (null for unregistered work
+  strands), status (open|done|carried|dropped), carried_from, done_at. One
+  day's execution state; Notion remains the record of work, with no status
+  sync obligation in either direction. The content law applies to every row.
+  Aki's dashboard taps and add-item entries are her own manual writes, the
+  same class as pasting a signal; AI writes stay gated at the three moments.
+  Carries are written at checkout only: today's open row is set to carried and
+  a fresh open row lands on the next working day with carried_from pointing
+  back. Dropped is never auto-assigned.
 
 ## The brief (format contract)
 
