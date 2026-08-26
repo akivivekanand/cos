@@ -14,9 +14,20 @@ Follow CLAUDE.md's content law, table contracts, and connection rules throughout
    - Any decisions or priority changes? (each one gets a Why)
    - What does tomorrow look like? (paste calendar if handy, or skip)
 4. UPDATE state per the contracts: project rows (status, next_action, pct, touched), week priorities pct, flags (insert new, resolve done), decisions rows with Why, tomorrow's `today` row from the pasted calendar.
-5. INSERT the daily_logs row: what moved, decisions, flags delta, signals_count, tomorrow's setup.
-6. PRE-DRAFT tomorrow's brief per the /brief protocol and INSERT it into `briefs`, so it is waiting when she opens the dashboard.
-7. SHOW her a plain summary of every row created or changed.
-8. Stop. No sign-off, no offers.
+5. CHECKLIST: read today's checklist_items. Her dashboard taps stand as
+   written. For each row still open, ask carried or dropped in the same
+   message as anything else outstanding; default carried. Carried: set
+   today's row to carried and insert an open row for the next working day
+   with carried_from set to today. Dropped is never auto-assigned. Then seed
+   the next working day in the same batch: items she names for tomorrow in
+   the three questions, plus any project next_action she explicitly confirms
+   as a tomorrow item. Never invent items from state without her
+   confirmation; skip titles already present for that date; every row must
+   pass the content law. No stated items means the seed is carries only, and
+   say so.
+6. INSERT the daily_logs row: what moved, decisions, flags delta, signals_count, tomorrow's setup.
+7. PRE-DRAFT tomorrow's brief per the /brief protocol and INSERT it into `briefs`, so it is waiting when she opens the dashboard.
+8. SHOW her a plain summary of every row created or changed.
+9. Stop. No sign-off, no offers.
 
 Target: under five minutes of her time.
