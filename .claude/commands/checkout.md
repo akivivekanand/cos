@@ -18,16 +18,33 @@ Follow CLAUDE.md's content law, table contracts, and connection rules throughout
    written. For each row still open, ask carried or dropped in the same
    message as anything else outstanding; default carried. Carried: set
    today's row to carried and insert an open row for the next working day
-   with carried_from set to today. Dropped is never auto-assigned. Then seed
-   the next working day in the same batch: items she names for tomorrow in
-   the three questions, plus any project next_action she explicitly confirms
-   as a tomorrow item. Never invent items from state without her
-   confirmation; skip titles already present for that date; every row must
-   pass the content law. No stated items means the seed is carries only, and
-   say so.
+   with carried_from set to today. Dropped is never auto-assigned.
+   Then pull the Notion Tasks database per the Notion read law: status is
+   not Done, Owner contains Aki, Due on or before the next working day,
+   Project limited to the allowlist inside the query filter itself. Show
+   the pull as proposed seed rows next to the carries: title, due, project,
+   one line each. She confirms, edits, or strikes in one message; only
+   confirmed rows are inserted, with source_url set to the Notion row and
+   slugs mapped per the table contract. Add anything she names in the three
+   questions. Skip titles already present for that date. If the pull fails
+   or returns nothing, say so plainly and seed carries plus stated items
+   only. Never invent items.
 6. INSERT the daily_logs row: what moved, decisions, flags delta, signals_count, tomorrow's setup.
 7. PRE-DRAFT tomorrow's brief per the /brief protocol and INSERT it into `briefs`, so it is waiting when she opens the dashboard.
 8. SHOW her a plain summary of every row created or changed.
-9. Stop. No sign-off, no offers.
+9. NOTION HANDOFF: print a paste-ready digest for claude.ai, fenced as plain
+   markdown, containing only what COS knows that Notion does not. Compare
+   against today's pull before writing it; anything already current in
+   Notion is omitted. Sections, each skipped when empty:
+   - Done today: checklist items tapped or confirmed done, one line each,
+     with the Notion link when the row came from the tracker.
+   - Dropped: items consciously let go, with her stated reason.
+   - Carried: items rolled to the next working day.
+   - Decisions: today's decisions rows, each with its Why.
+   - New: items added in COS today that have no Notion row yet.
+   Facts only, people rule applies, nothing from excluded categories. End
+   the digest with one line: "Paste into claude.ai to sync the record."
+   COS never writes these to Notion itself.
+10. Stop. No sign-off, no offers.
 
 Target: under five minutes of her time.
