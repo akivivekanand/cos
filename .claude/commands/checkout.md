@@ -29,18 +29,28 @@ Follow CLAUDE.md's content law, table contracts, and connection rules throughout
    questions. Skip titles already present for that date. If the pull fails
    or returns nothing, say so plainly and seed carries plus stated items
    only. Never invent items.
+   Carry each pulled row's Type into item_type on the rows she confirms.
+   Then, from the same pull, write today's portfolio snapshot: one row per
+   project with open counts by type, the nearest due date, and that item's
+   title in next_item. Delete any existing rows for today's as_of before
+   inserting so the snapshot is replaced rather than duplicated. Projects
+   with no open rows are omitted. If the pull failed, skip the snapshot and
+   say so; never write a portfolio row from memory.
 6. INSERT the daily_logs row: what moved, decisions, flags delta, signals_count, tomorrow's setup.
 7. PRE-DRAFT tomorrow's brief per the /brief protocol and INSERT it into `briefs`, so it is waiting when she opens the dashboard.
 8. SHOW her a plain summary of every row created or changed.
 9. NOTION HANDOFF: print a paste-ready digest for claude.ai, fenced as plain
    markdown, containing only what COS knows that Notion does not. Compare
    against today's pull before writing it; anything already current in
-   Notion is omitted. Sections, each skipped when empty:
-   - Done today: checklist items tapped or confirmed done, one line each,
+   Notion is omitted. Sections, each skipped when empty and each grouped by item type where it
+   applies:
+   - Replies sent: Email reply items closed today.
+   - Decisions made: Decision items closed today, each with the call and its
+     Why, matching the decisions rows written this checkout.
+   - Done today: Task and Status check items closed today, one line each,
      with the Notion link when the row came from the tracker.
    - Dropped: items consciously let go, with her stated reason.
-   - Carried: items rolled to the next working day.
-   - Decisions: today's decisions rows, each with its Why.
+   - Carried: items rolled to the next working day, noting their type.
    - New: items added in COS today that have no Notion row yet.
    Facts only, people rule applies, nothing from excluded categories. End
    the digest with one line: "Paste into claude.ai to sync the record."
