@@ -380,6 +380,21 @@
   .ck-src{font-size:10.5px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:2px;padding-top:4px}
   .ck-add{display:flex;gap:10px;margin-top:14px}
   .ck-add input{flex:1 1 auto;background:var(--paper);border:1px solid var(--line);padding:9px 10px;color:var(--ink);font:inherit;font-size:13.5px}
+  .ck-group{margin-bottom:22px}
+  .ck-group:last-child{margin-bottom:0}
+  .ck-group h4{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px}
+  .ck-group.emails h4{color:var(--ochre)}
+  .ck-group.decisions h4{color:var(--aub)}
+  /* ------- portfolio ------- */
+  .pf-row{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line-soft)}
+  .pf-row:last-child{border-bottom:none}
+  .pf-name{font-size:14.5px;color:var(--ink)}
+  .pf-counts{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);white-space:nowrap}
+  .pf-counts b{font-weight:600;color:var(--ink)}
+  .pf-next{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);text-align:right}
+  .pf-next.soon{color:var(--ochre)}
+  .pf-next.late{color:var(--aub)}
+  @media(max-width:640px){.pf-row{grid-template-columns:1fr;gap:2px}.pf-next{text-align:left}}
 
   /* ------- footer ------- */
   footer{
@@ -542,13 +557,18 @@
       </div>
       <div class="pulse" id="pulse-grid"></div>
       <div class="blk reveal" style="--d:.12s;margin-top:26px">
-        <div class="eyebrow" id="ck-eyebrow">Today's checklist</div>
+        <div class="eyebrow" id="ck-eyebrow">Today</div>
         <div id="ck-body"></div>
         <div class="ck-add">
           <input id="ck-input" type="text" maxlength="140"
-                 placeholder="Add an item for today (your write, not the AI's)">
+                 placeholder="Add a task for today (your write, not the AI's)">
           <button class="btn ghost" id="ck-addBtn">Add</button>
         </div>
+      </div>
+
+      <div class="blk reveal" style="--d:.18s;margin-top:26px">
+        <div class="eyebrow" id="pf-eyebrow">Portfolio</div>
+        <div id="pf-body"></div>
       </div>
     </section>
 
@@ -737,7 +757,8 @@ function fetchState(then){
     supa.from('signals').select('id',{count:'exact',head:true}).is('processed_at',null),
     supa.from('daily_logs').select('log_date,signals_count').order('log_date',{ascending:true}).limit(60),
     supa.from('briefs').select('*').order('generated_at',{ascending:false}).limit(1),
-    supa.from('checklist_items').select('*').eq('item_date',todayIso).order('position',{ascending:true})
+    supa.from('checklist_items').select('*').eq('item_date',todayIso).order('position',{ascending:true}),
+    supa.from('portfolio').select('*').order('next_due',{ascending:true})
   ]).then(function(r){
     var err=r.find(function(x){return x.error;});
     if(err){ $('statusline').innerHTML='<span class="warn">Supabase error: '+esc(err.error.message)+' · has schema.sql been run?</span>'; return; }
@@ -779,7 +800,7 @@ function fetchState(then){
       today:today, brief:bf?{md:bf.md,generatedAt:bf.generated_at}:null,
       signals:{items:sigItems,pending:pending,todayCount:todayCount},
       stats:{streak:streak,lastLog:lastLog,dailyCount:logs.length}, spark:spark,
-      checklist:r[9].data||[] };
+      checklist:r[9].data||[], portfolio:r[10].data||[] };
     renderAll(); if(then)then();
   }).catch(function(e){
     $('statusline').innerHTML='<span class="warn">Could not reach Supabase · '+esc(e.message||e)+'</span>';
@@ -1001,31 +1022,76 @@ function renderSignals(){
 function renderAll(){
   var sel=$('tagSel');
   if(sel&&STATE&&STATE.projects){ var cur=sel.value; sel.innerHTML='<option value="">none</option><option value="calendar">calendar</option>'+STATE.projects.map(function(p){return '<option value="'+esc(p.file)+'">'+esc(p.file)+'</option>';}).join(''); sel.value=cur; }
-  renderMasthead(); renderPulse(); renderChecklist(); renderBrief(); renderBoard(); renderDecisions(); renderWeek(); renderSignals();
+  renderMasthead(); renderPulse(); renderChecklist(); renderPortfolio(); renderBrief(); renderBoard(); renderDecisions(); renderWeek(); renderSignals();
   animateView(document.querySelector('.view.active'));
 }
 
-// ============ checklist ============
+// ============ checklist, grouped by type ============
+var CK_GROUPS=[
+  {key:'Email reply', label:'Emails to respond to', cls:'emails'},
+  {key:'Decision',    label:'Decisions to make',    cls:'decisions'},
+  {key:'Task',        label:'Tasks to complete',    cls:'tasks'},
+  {key:'Status check',label:'Status checks',        cls:'checks'}
+];
+function ckRow(r){
+  var meta=[];
+  if(r.note)meta.push(esc(r.note));
+  if(r.carried_from)meta.push('carried from '+esc(r.carried_from));
+  if(r.project_slug)meta.push(esc(r.project_slug));
+  return '<div class="ck-row'+(r.status==='done'?' done':'')+'" data-id="'+esc(r.id)+'">'
+    +'<span class="ck-box" aria-hidden="true"></span>'
+    +'<span class="ck-text"><span class="ck-title">'+esc(r.title)+'</span>'
+    +(meta.length?'<span class="ck-note mono">'+meta.join(' · ')+'</span>':'')
+    +'</span>'
+    +(r.source_url?'<a class="ck-src mono" target="_blank" rel="noopener" href="'+esc(r.source_url)+'">record</a>':'')
+    +'</div>';
+}
 function renderChecklist(){
   var box=$('ck-body'); if(!box)return;
   var rows=(STATE&&STATE.checklist||[]).filter(function(r){return r.status==='open'||r.status==='done';});
   var doneN=rows.filter(function(r){return r.status==='done';}).length;
-  $('ck-eyebrow').textContent="Today's checklist · "+doneN+' of '+rows.length+' closed · taps write as you';
+  $('ck-eyebrow').textContent='Today · '+doneN+' of '+rows.length+' closed · taps write as you';
   if(!rows.length){
     box.innerHTML='<div class="empty">No checklist for today. Checkout seeds tomorrow; add an item below if the day needs one.</div>';
     return;
   }
-  box.innerHTML=rows.map(function(r){
-    var meta=[];
-    if(r.note)meta.push(esc(r.note));
-    if(r.carried_from)meta.push('carried from '+esc(r.carried_from));
-    if(r.project_slug)meta.push(esc(r.project_slug));
-    return '<div class="ck-row'+(r.status==='done'?' done':'')+'" data-id="'+esc(r.id)+'">'
-      +'<span class="ck-box" aria-hidden="true"></span>'
-      +'<span class="ck-text"><span class="ck-title">'+esc(r.title)+'</span>'
-      +(meta.length?'<span class="ck-note mono">'+meta.join(' · ')+'</span>':'')
-      +'</span>'
-      +(r.source_url?'<a class="ck-src mono" target="_blank" rel="noopener" href="'+esc(r.source_url)+'">record</a>':'')
+  var html='';
+  CK_GROUPS.forEach(function(g){
+    var set=rows.filter(function(r){return (r.item_type||'Task')===g.key;});
+    if(!set.length)return;
+    var d=set.filter(function(r){return r.status==='done';}).length;
+    html+='<div class="ck-group '+g.cls+'"><h4>'+g.label+' · '+d+'/'+set.length+'</h4>'
+      +set.map(ckRow).join('')+'</div>';
+  });
+  box.innerHTML=html;
+}
+// ============ portfolio ============
+function renderPortfolio(){
+  var box=$('pf-body'); if(!box)return;
+  var rows=(STATE&&STATE.portfolio)||[];
+  if(!rows.length){
+    box.innerHTML='<div class="empty">No portfolio snapshot yet. The next checkout writes one from the tracker.</div>';
+    return;
+  }
+  var asOf=rows[0].as_of;
+  $('pf-eyebrow').textContent='Portfolio · '+rows.length+' active strands · as of '+asOf;
+  var todayIso=isoLocal(new Date());
+  box.innerHTML=rows.map(function(p){
+    var bits=[];
+    if(p.open_emails)bits.push('<b>'+p.open_emails+'</b> reply'+(p.open_emails>1?'s':''));
+    if(p.open_decisions)bits.push('<b>'+p.open_decisions+'</b> decision'+(p.open_decisions>1?'s':''));
+    if(p.open_tasks)bits.push('<b>'+p.open_tasks+'</b> task'+(p.open_tasks>1?'s':''));
+    if(p.open_checks)bits.push('<b>'+p.open_checks+'</b> check'+(p.open_checks>1?'s':''));
+    var cls='',due='no dated item';
+    if(p.next_due){
+      due='next '+esc(p.next_due);
+      if(p.next_due<todayIso){cls=' late';due='overdue '+esc(p.next_due);}
+      else if(workingDaysBetween(todayIso,new Date(p.next_due+'T12:00:00'))<=2){cls=' soon';}
+    }
+    return '<div class="pf-row">'
+      +'<span class="pf-name">'+esc(p.project)+(p.next_item?'<span class="pf-counts"> · '+esc(p.next_item)+'</span>':'')+'</span>'
+      +'<span class="pf-counts">'+(bits.join(' · ')||'clear')+'</span>'
+      +'<span class="pf-next'+cls+'">'+due+'</span>'
       +'</div>';
   }).join('');
 }
@@ -1051,7 +1117,7 @@ $('ck-addBtn').addEventListener('click',function(){
   var inp=$('ck-input'), t=(inp.value||'').trim();
   if(!t)return;
   var pos=((STATE&&STATE.checklist)||[]).length+1;
-  supa.from('checklist_items').insert({item_date:isoLocal(new Date()),title:t,position:pos}).then(function(res){
+  supa.from('checklist_items').insert({item_date:isoLocal(new Date()),title:t,position:pos,item_type:'Task'}).then(function(res){
     if(res.error){ toast('Add failed: '+res.error.message); return; }
     inp.value=''; toast('Added'); fetchState();
   });

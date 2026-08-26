@@ -77,6 +77,16 @@ honestly, it never blocks checkout.
   map Project to slug: Groundwork to groundwork, Career Labs to career-labs;
   FDS, Career Plan, Handshake Data & API, and Coordination carry null until
   registered as projects.
+  item_type mirrors the Notion Type select: Task, Email reply, Decision,
+  Status check. Seed rows carry the pulled row's Type; items Aki adds on the
+  dashboard default to Task. The dashboard groups the day by this field.
+- `portfolio`: as_of, project (the Notion Project value), slug (the COS
+  project slug when one exists, else null), open_tasks, open_emails,
+  open_decisions, open_checks, next_due, next_item. One row per project per
+  day, written at checkout only, from the same allowlisted pull that seeds the
+  checklist. It is a materialized read of Notion, never a second record: it is
+  rewritten each checkout and never edited by hand. Projects with no open rows
+  are omitted. The dashboard reads it so the browser never calls Notion.
 
 ## The brief (format contract)
 

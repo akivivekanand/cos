@@ -58,6 +58,9 @@ Markdown, exactly these headings, in this order, nothing added and nothing dropp
 order, with the done count stated plainly. If no rows exist for today, say the
 last checkout did not seed a checklist and stop pretending otherwise. The
 checklist is read here, never written here.
+Group the checklist by type when stating it: replies outstanding, decisions
+waiting, then tasks. A day with an unanswered reply older than two working
+days surfaces that fact here or in Flags.
 
 **The week's arc** · The `week` row. If `set_at` is still `pending`, say the week was never set at closeout. Priorities with their percentages, and where the week stands against them.
 
